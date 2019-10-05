@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/main_navigation_bar_menu_register"
+        android:title="@string/nav_bar_register"
+        android:icon="@drawable/ic_vpn_key_black_24dp"/>
+    <item
+        android:id="@+id/main_navigation_bar_menu_calendar"
+        android:title="@string/nav_bar_calendar"
+        android:icon="@drawable/ic_event_black_24dp"/>
+    <item
+        android:id="@+id/main_navigation_bar_menu_timetable"
+        android:title="@string/nav_bar_timetable"
+        android:icon="@drawable/ic_access_time_black_24dp"/>
+    <item
+        android:id="@+id/main_navigation_bar_menu_desk_editor"
+        android:title="@string/nav_bar_desk_editor"
+        android:icon="@drawable/ic_mode_edit_black_24dp"/>
+</menu>

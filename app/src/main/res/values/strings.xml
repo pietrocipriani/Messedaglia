@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name" translatable="false">Messedaglia</string>
+    <string name="nav_bar_register">Register</string>
+    <string name="nav_bar_calendar">Calendar</string>
+    <string name="nav_bar_timetable">Timetable</string>
+    <string name="nav_bar_desk_editor">Desk Editor</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+</resources>

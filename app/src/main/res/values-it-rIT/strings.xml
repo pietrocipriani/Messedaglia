@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_bar_register">Registro</string>
+    <string name="nav_bar_calendar">Calendario</string>
+    <string name="nav_bar_timetable">Orari</string>
+    <string name="nav_bar_desk_editor">Cambio Posti</string>
+</resources>

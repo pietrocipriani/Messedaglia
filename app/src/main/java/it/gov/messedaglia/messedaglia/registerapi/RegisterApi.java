@@ -1,5 +1,6 @@
 package it.gov.messedaglia.messedaglia.registerapi;
 
+import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -8,7 +9,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -18,9 +27,12 @@ import java.util.AbstractMap;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeSet;
+
+import it.gov.messedaglia.messedaglia.SortedList;
 
 public class RegisterApi {
+    private final static String TAG = "RegisterApi";
+
     private final static String BASE_URL = "https://web.spaggiari.eu"; //   /rest/v1/auth/login"
     private final static String API_KEY = "Tg1NWEwNGIgIC0K";
 
@@ -29,6 +41,50 @@ public class RegisterApi {
     private static long tokenExpire = 0;
 
     private static Thread logThread = null;
+
+    public static Runnable onMarksUpdate;
+
+    public static boolean load (Context context) {
+        File file = new File(context.getFilesDir(), "login.data");
+        if (!file.exists()) return false;
+        try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))){
+            byte bytes[] = new byte[dis.readByte()];
+            dis.readFully(bytes);
+            username = new String(bytes);
+            bytes = new byte[dis.readByte()];
+            dis.readFully(bytes);
+            password = new String(bytes);
+            tokenExpire = dis.readLong();
+            bytes = new byte[dis.readShort()];
+            dis.readFully(bytes);
+            token = new String(bytes);
+
+            // TODO: load marks data
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        return token != null && tokenExpire > System.currentTimeMillis();
+    }
+    public static void save (Context context){
+        File file = new File(context.getFilesDir(), "login.data");
+        Log.println(Log.ASSERT, TAG, file.getAbsolutePath());
+        try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))){
+            byte bytes[] = username.getBytes();
+            dos.writeByte(bytes.length);
+            dos.write(bytes);
+            bytes = password.getBytes();
+            dos.writeByte(bytes.length);
+            dos.write(bytes);
+            dos.writeLong(tokenExpire);
+            bytes = token.getBytes();
+            dos.writeShort(bytes.length);
+            dos.write(bytes);
+
+            // TODO: save data
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+    }
 
     public static void updateCredentials (@NonNull String username, @NonNull String password, @Nullable Runnable then) {
         if (username.equals(RegisterApi.username) && password.equals(RegisterApi.password)) {
@@ -116,15 +172,22 @@ public class RegisterApi {
                         new AbstractMap.SimpleEntry<>("Z-If-None-Match", null)  // TODO: pass 'etag'
                 ).getJSONArray("grades");
 
+                Log.println(Log.ASSERT, TAG, array.toString(4));
+
                 for (int i=0; i<array.length(); i++) {
                     JSONObject obj = array.getJSONObject(i);
                     MarksData.Subject subject = MarksData.data.get(obj.getInt("subjectId"));
                     if (subject == null) {
-                        subject = new MarksData.Subject();
+                        subject = new MarksData.Subject(obj.getString("subjectDesc"));
                         MarksData.data.put(obj.getInt("subjectId"), subject);
                     }
-                    // TODO: complete mark parsing
+                    subject.marks.add(new MarksData.Mark(
+                            obj.getDouble("decimalValue"),
+                            obj.getString("displayValue"),
+                            obj.getInt("displaPos")
+                    ));
                 }
+                Log.println(Log.ASSERT, TAG, MarksData.data.toString());
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (JSONException e) {
@@ -132,6 +195,8 @@ public class RegisterApi {
             }
 
             if (then != null) then.run();
+            Log.println(Log.ASSERT, TAG, ""+onMarksUpdate);
+            if (onMarksUpdate != null) onMarksUpdate.run();
 
         }).start();
     }
@@ -141,13 +206,36 @@ public class RegisterApi {
         public static final HashMap<Integer, Subject> data = new HashMap<>();
 
         public static class Subject {
-            public final TreeSet<Mark> marks = new TreeSet<>();
+            public final SortedList<Mark> marks = new SortedList<>();
+            public final String name;
+
+            public Subject (String name) {
+                this.name = name;
+            }
+
+            @NonNull
+            @Override
+            public String toString (){
+                return marks.toString();
+            }
         }
 
         public static class Mark implements Comparable<Mark>{
             public double decimalValue;
-            public String dislayValue;
+            public String displayValue;
             private int pos;
+
+            public Mark (double decimalValue, String displayValue, int pos){
+                this.decimalValue = decimalValue;
+                this.displayValue = displayValue;
+                this.pos = pos;
+            }
+
+            @NonNull
+            @Override
+            public String toString (){
+                return displayValue;
+            }
 
             @Override
             public int compareTo(Mark mark) {

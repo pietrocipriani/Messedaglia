@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.text.InputType;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -44,7 +45,9 @@ public class Register extends Fragment {
         Context context = inflater.getContext();
         prefs = context.getSharedPreferences("register", Context.MODE_PRIVATE);
 
-        if (!logged){
+        if (!RegisterApi.load(getContext())){
+            // TODO: maybe the token expired, try to do a new login with saved data
+
             AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(getContext());
             dialogBuilder.setTitle("Login");
             dialogBuilder.setMessage("Esegui il login per accedere alla tua area personale");
@@ -60,7 +63,7 @@ public class Register extends Fragment {
             username.setInputType(InputType.TYPE_CLASS_TEXT);
 
             password.setHint("password");
-            password.setInputType(InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            password.setInputType(InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD);
 
             dialogBuilder.setPositiveButton("ACCEDI", (DialogInterface dialogInterface, int i) ->
                     RegisterApi.updateCredentials(username.getText().toString(), password.getText().toString(), () -> RegisterApi.updateAll(null))
@@ -71,8 +74,15 @@ public class Register extends Fragment {
 
             dialogBuilder.setView(root);
             dialogBuilder.create().show();
-        }
+        } else RegisterApi.updateAll(null);
 
         return inflater.inflate(R.layout.fragment_register, container, false);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.println(Log.ASSERT, "Register", "onDestroy");
+        RegisterApi.save(getContext());
     }
 }

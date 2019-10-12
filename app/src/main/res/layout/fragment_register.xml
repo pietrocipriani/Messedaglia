@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".fragments.Register">
 
     <android.support.design.widget.TabLayout
+        android:id="@+id/register_tabs"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/colorPrimary">
@@ -30,4 +31,12 @@
             android:text="BACHECA" />
     </android.support.design.widget.TabLayout>
 
-</FrameLayout>
+    <fragment
+        android:id="@+id/fragment2"
+        android:layout_below="@id/register_tabs"
+        android:name="it.gov.messedaglia.messedaglia.fragments.register.MarksFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+
+</RelativeLayout>

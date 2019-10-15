@@ -1,13 +1,22 @@
 package it.gov.messedaglia.messedaglia.views;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.SweepGradient;
+import android.os.Handler;
+import android.os.Looper;
+import android.renderscript.Sampler;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.View;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.Animation;
+import android.view.animation.Interpolator;
+import android.view.animation.Transformation;
 
 import it.gov.messedaglia.messedaglia.Utils;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi;
@@ -18,6 +27,8 @@ public class MarkView extends View {
     private final static int INVALID_COLORS[] = new int[]{0x00000099, 0xFF000099};
 
     private RegisterApi.MarksData.Mark mark;
+
+    private float progress = 0;
 
     private final Paint paint = new Paint();
     private SweepGradient gradient = new SweepGradient(0, 0, INVALID_COLORS, new float[]{0, 1});
@@ -39,6 +50,16 @@ public class MarkView extends View {
         super(context, attrs, defStyleAttr);
 
         gradient.setLocalMatrix(MATRIX);
+
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(2000);
+        animator.setInterpolator(new AccelerateInterpolator());
+        animator.addUpdateListener((anim) -> {
+            gradient = new SweepGradient(0, 0, SUFFICIENT_COLORS, new float[]{0, (mark != null ? (float) (360*mark.decimalValue/10) : 360)*anim.getAnimatedFraction()});
+            gradient.setLocalMatrix(MATRIX);
+            invalidate(anim.getAnimatedFraction());
+        });
+        animator.start();
 
         paint.setAntiAlias(true);
         paint.setColor(0xFF000000);
@@ -62,6 +83,8 @@ public class MarkView extends View {
         setMeasuredDimension(width, height);
     }
 
+
+
     @Override
     protected void onDraw(Canvas canvas) {
         int L = Math.min(getWidth()-getPaddingRight()-getPaddingLeft(), getHeight()-getPaddingTop()-getPaddingBottom());
@@ -78,7 +101,7 @@ public class MarkView extends View {
         canvas.translate(getWidth()/2f, getHeight()/2f);
         //canvas.clipPath(clip);
 
-        canvas.drawArc(-L/2f+paint.getStrokeWidth()/2f, -L/2f+paint.getStrokeWidth()/2f, L/2f-paint.getStrokeWidth()/2f, L/2f-paint.getStrokeWidth()/2f, -90, mark != null ? (float) (360*mark.decimalValue/10) : 360, false, paint);
+        canvas.drawArc(-L/2f+paint.getStrokeWidth()/2f, -L/2f+paint.getStrokeWidth()/2f, L/2f-paint.getStrokeWidth()/2f, L/2f-paint.getStrokeWidth()/2f, -90, (mark != null ? (float) (360*mark.decimalValue/10) : 360)*progress, false, paint);
 
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
@@ -87,5 +110,10 @@ public class MarkView extends View {
 
         canvas.drawText(mark != null ? mark.displayValue : "?", 0, paint.getTextSize()/2, paint);
         //canvas.drawCircle(0, 0, L/2f, paint);
+    }
+
+    public void invalidate (float progress) {
+        this.progress = progress;
+        invalidate();
     }
 }

@@ -11,10 +11,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import it.gov.messedaglia.messedaglia.R;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi.MarksData.Subject;
+import it.gov.messedaglia.messedaglia.views.Chart;
 import it.gov.messedaglia.messedaglia.views.MarkView;
 
 public class MarksFragment extends Fragment {
@@ -45,12 +47,16 @@ public class MarksFragment extends Fragment {
 
     public void loadMarks () {
         root.removeAllViews();
-        for (Subject s : RegisterApi.MarksData.data.values())
-            for (RegisterApi.MarksData.Mark m : s.marks) {
-                View subject = LayoutInflater.from(getContext()).inflate(R.layout.subject_item, root, false);
-                root.addView(subject);
-                ((MarkView) subject.findViewById(R.id.markView)).setMark(m);
-            }
+        for (Subject s : RegisterApi.MarksData.data.values()) {
+            View subject = LayoutInflater.from(getContext()).inflate(R.layout.subject_item, root, false);
+            subject.setOnClickListener((sbj) -> {
+                View v = sbj.findViewById(R.id.chart);
+                v.setVisibility(View.GONE - v.getVisibility());
+            });
+            root.addView(subject);
+            ((TextView) subject.findViewById(R.id.textView)).setText(s.name);
+            ((MarkView) subject.findViewById(R.id.markView)).setMark(new RegisterApi.MarksData.Mark(s.getAverage(), String.valueOf(s.getAverage()), 0));
+        }
     }
 
     /*private class RegisterAdapter extends RecyclerView.Adapter<RegisterViewHolder> {

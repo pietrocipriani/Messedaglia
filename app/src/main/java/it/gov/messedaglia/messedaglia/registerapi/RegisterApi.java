@@ -89,12 +89,16 @@ public class RegisterApi {
     public static void updateCredentials (@NonNull String username, @NonNull String password, @Nullable Runnable then) {
         if (username.equals(RegisterApi.username) && password.equals(RegisterApi.password)) {
             if ((logThread != null && logThread.isAlive()) || tokenExpire >= System.currentTimeMillis()) return;
-            logIn(then);
-            return;
+        } else {
+            RegisterApi.username = username;
+            RegisterApi.password = password;
         }
-        RegisterApi.username = username;
-        RegisterApi.password = password;
         logIn(then);
+    }
+    public static boolean logWithCredentials (@Nullable Runnable then) {
+        if (username == null || password == null) return false;
+        logIn(then);
+        return true;
     }
 
     private static JSONObject getJSONObject (String url, String method, String body, Map.Entry<String, String>... headers) throws IOException, JSONException {
@@ -181,7 +185,7 @@ public class RegisterApi {
                         subject = new MarksData.Subject(obj.getString("subjectDesc"));
                         MarksData.data.put(obj.getInt("subjectId"), subject);
                     }
-                    subject.marks.add(new MarksData.Mark(
+                    subject.addMark(new MarksData.Mark(
                             obj.getDouble("decimalValue"),
                             obj.getString("displayValue"),
                             obj.getInt("displaPos")
@@ -208,9 +212,19 @@ public class RegisterApi {
         public static class Subject {
             public final SortedList<Mark> marks = new SortedList<>();
             public final String name;
+            private double average = 0;
 
             public Subject (String name) {
                 this.name = name;
+            }
+
+            public void addMark (Mark mark){
+                average = (average*marks.size()+mark.decimalValue)/(marks.size()+1);
+                marks.add(mark);
+            }
+
+            public float getAverage () {
+                return Math.round(average*10f)/10f;
             }
 
             @NonNull

@@ -2,6 +2,7 @@ package it.gov.messedaglia.messedaglia.fragments.register;
 
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -14,12 +15,13 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import it.gov.messedaglia.messedaglia.R;
+import it.gov.messedaglia.messedaglia.fragments.Register;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi.MarksData.Subject;
 import it.gov.messedaglia.messedaglia.views.Chart;
 import it.gov.messedaglia.messedaglia.views.MarkView;
 
-public class MarksFragment extends Fragment {
+public class MarksFragment extends RegisterFragment {
     private LinearLayout root;
 
 
@@ -43,20 +45,35 @@ public class MarksFragment extends Fragment {
 
         root = view.findViewById(R.id.marks_list);
         loadMarks();
+
     }
 
     public void loadMarks () {
         root.removeAllViews();
-        for (Subject s : RegisterApi.MarksData.data.values()) {
+        for (int i = 0; i< RegisterApi.MarksData.data.size(); i++) {
+            Subject s = RegisterApi.MarksData.data.valueAt(i);
             View subject = LayoutInflater.from(getContext()).inflate(R.layout.subject_item, root, false);
             subject.setOnClickListener((sbj) -> {
-                View v = sbj.findViewById(R.id.chart);
-                v.setVisibility(View.GONE - v.getVisibility());
+                AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                builder.setCustomTitle(new TitleMarkView(getContext(), s.getAverage()/10, s.name));
+
+                View view = View.inflate(getContext(), R.layout.marks_subject_details, null);
+                builder.setView(view);
+
+                Chart v = view.findViewById(R.id.chart);
+                v.setSubject(s);
+
+                builder.create().show();
             });
             root.addView(subject);
             ((TextView) subject.findViewById(R.id.textView)).setText(s.name);
             ((MarkView) subject.findViewById(R.id.markView)).setMark(new RegisterApi.MarksData.Mark(s.getAverage(), String.valueOf(s.getAverage()), 0));
         }
+    }
+
+    @Override
+    public long getLastUpdate() {
+        return RegisterApi.MarksData.lastUpdate;
     }
 
     /*private class RegisterAdapter extends RecyclerView.Adapter<RegisterViewHolder> {

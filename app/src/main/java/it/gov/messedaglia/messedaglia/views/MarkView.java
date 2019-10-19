@@ -6,7 +6,10 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.SweepGradient;
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Looper;
 import android.renderscript.Sampler;
@@ -33,6 +36,8 @@ public class MarkView extends View {
     private final Paint paint = new Paint();
     private SweepGradient gradient = new SweepGradient(0, 0, INVALID_COLORS, new float[]{0, 1});
     private final static Matrix MATRIX = new Matrix();
+
+    private final float textSize;
 
     static {
         MATRIX.postRotate(-90);
@@ -63,15 +68,20 @@ public class MarkView extends View {
 
         paint.setAntiAlias(true);
         paint.setColor(0xFF000000);
+        paint.setTypeface(Typeface.DEFAULT_BOLD);
+
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(Utils.dpToPx(20));
+
+        Rect bounds = new Rect();
+        paint.getTextBounds("0", 0, 1, bounds);
+        textSize = bounds.height();
     }
 
     public void setMark (RegisterApi.MarksData.Mark mark){
         this.mark = mark;
         gradient = new SweepGradient(0, 0, SUFFICIENT_COLORS, new float[]{0, (float) (mark.decimalValue/10)});
         gradient.setLocalMatrix(MATRIX);
-
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(Utils.dpToPx(20));
 
         invalidate();
     }
@@ -108,7 +118,7 @@ public class MarkView extends View {
 
         paint.setStrokeWidth(Utils.dpToPx(1));
 
-        canvas.drawText(mark != null ? mark.displayValue : "?", 0, paint.getTextSize()/2, paint);
+        canvas.drawText(mark != null ? mark.displayValue : "?", 0, textSize/2, paint);
         //canvas.drawCircle(0, 0, L/2f, paint);
     }
 

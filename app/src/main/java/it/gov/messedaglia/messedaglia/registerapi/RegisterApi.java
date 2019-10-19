@@ -4,6 +4,7 @@ import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.util.SparseArray;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -191,7 +192,7 @@ public class RegisterApi {
                             obj.getInt("displaPos")
                     ));
                 }
-                Log.println(Log.ASSERT, TAG, MarksData.data.toString());
+                MarksData.lastUpdate = System.currentTimeMillis();
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (JSONException e) {
@@ -207,18 +208,20 @@ public class RegisterApi {
 
 
     public static class MarksData {
-        public static final HashMap<Integer, Subject> data = new HashMap<>();
+        public static final SparseArray<Subject> data = new SparseArray<>();
+
+        public static long lastUpdate = 0;
 
         public static class Subject {
             public final SortedList<Mark> marks = new SortedList<>();
             public final String name;
             private double average = 0;
 
-            public Subject (String name) {
+            Subject (String name) {
                 this.name = name;
             }
 
-            public void addMark (Mark mark){
+            void addMark (Mark mark){
                 average = (average*marks.size()+mark.decimalValue)/(marks.size()+1);
                 marks.add(mark);
             }

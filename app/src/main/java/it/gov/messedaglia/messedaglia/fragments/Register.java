@@ -5,21 +5,36 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.design.widget.TabLayout;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 import android.text.InputType;
+import android.text.format.DateUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import java.util.Calendar;
+import java.util.Date;
 
 import it.gov.messedaglia.messedaglia.R;
+import it.gov.messedaglia.messedaglia.fragments.register.MarksFragment;
+import it.gov.messedaglia.messedaglia.fragments.register.RegisterFragment;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi;
 import it.gov.messedaglia.messedaglia.Utils;
 
 public class Register extends Fragment {
+    private TextView lastUpdateView;
+
+    private RegisterFragment currentFragment;
 
     public Register() {}
 
@@ -37,6 +52,8 @@ public class Register extends Fragment {
                              Bundle savedInstanceState) {
 
         Context context = inflater.getContext();
+
+        setFragment(new MarksFragment());
         //prefs = context.getSharedPreferences("register", Context.MODE_PRIVATE);
 
         if (!RegisterApi.load(context)){
@@ -71,6 +88,31 @@ public class Register extends Fragment {
         } else RegisterApi.updateAll(null);
 
         return inflater.inflate(R.layout.fragment_register, container, false);
+    }
+
+    private void setFragment (RegisterFragment fragment) {
+        getChildFragmentManager().beginTransaction().replace(R.id.fragment2, fragment).commit();
+        currentFragment = fragment;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        lastUpdateView = view.findViewById(R.id.last_update);
+
+        Handler handler = new Handler();
+
+        Runnable run = new Runnable() {
+            @Override
+            public void run() {
+                lastUpdateView.setText("Ultimo aggiornamento: ");
+                lastUpdateView.append(Utils.intervalToString(currentFragment != null ? System.currentTimeMillis()-currentFragment.getLastUpdate() : -1));
+                handler.postDelayed(this, 6000);
+            }
+        };
+
+        handler.post(run);
     }
 
     @Override

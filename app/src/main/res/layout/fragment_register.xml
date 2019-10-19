@@ -34,9 +34,18 @@
     <fragment
         android:id="@+id/fragment2"
         android:layout_below="@id/register_tabs"
-        android:name="it.gov.messedaglia.messedaglia.fragments.register.MarksFragment"
+        android:layout_above="@id/last_update"
+        android:name="it.gov.messedaglia.messedaglia.fragments.BlankFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/last_update"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="5dp"
+        android:layout_alignParentBottom="true"
+        android:background="#AAA"/>
 
 
 </RelativeLayout>

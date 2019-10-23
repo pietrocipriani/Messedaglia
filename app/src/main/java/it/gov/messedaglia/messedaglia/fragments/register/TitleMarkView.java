@@ -1,7 +1,5 @@
 package it.gov.messedaglia.messedaglia.fragments.register;
 
-import android.animation.Animator;
-import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -26,6 +24,7 @@ public class TitleMarkView extends AppCompatTextView {
         setTextAlignment(TEXT_ALIGNMENT_CENTER);
         setTypeface(Typeface.DEFAULT_BOLD);
         setTextColor(0xFF000000);
+        //setSingleLine();
 
         this.mark = mark;
 

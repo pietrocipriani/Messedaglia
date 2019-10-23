@@ -5,6 +5,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.animation.Interpolator;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -17,19 +18,16 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.AbstractMap;
 import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
 
 import it.gov.messedaglia.messedaglia.SortedList;
+import it.gov.messedaglia.messedaglia.fragments.register.MarksFragment;
 
 public class RegisterApi {
     private final static String TAG = "RegisterApi";
@@ -87,6 +85,10 @@ public class RegisterApi {
         }
     }
 
+    private static void saveMarks (Context context){
+
+    }
+
     public static void updateCredentials (@NonNull String username, @NonNull String password, @Nullable Runnable then) {
         if (username.equals(RegisterApi.username) && password.equals(RegisterApi.password)) {
             if ((logThread != null && logThread.isAlive()) || tokenExpire >= System.currentTimeMillis()) return;
@@ -102,11 +104,12 @@ public class RegisterApi {
         return true;
     }
 
-    private static JSONObject getJSONObject (String url, String method, String body, Map.Entry<String, String>... headers) throws IOException, JSONException {
+    private static JSONObject getJSONObject (String url, String method, String body, String... headers) throws IOException, JSONException {
+        if (headers.length %2 != 0) throw new IllegalArgumentException("headers must be in pairs (key-value).");
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod(method);
         conn.setDoOutput(body != null);
-        for (Map.Entry<String, String> entry : headers) conn.setRequestProperty(entry.getKey(), entry.getValue());
+        for (int i=0; i<headers.length; i+=2) conn.setRequestProperty(headers[i], headers[i+1]);
         if (body != null) {
             PrintWriter out = new PrintWriter(conn.getOutputStream());
             out.print(body);
@@ -129,9 +132,9 @@ public class RegisterApi {
                         BASE_URL+"/rest/v1/auth/login",
                         "POST",
                         "{\"ident\":null,\"uid\":\""+username+"\",\"pass\":\""+password+"\"}",
-                        new AbstractMap.SimpleEntry<>("Z-Dev-Apikey", API_KEY),
-                        new AbstractMap.SimpleEntry<>("Content-Type", "application/json"),
-                        new AbstractMap.SimpleEntry<>("User-Agent", "CVVS/std/1.7.9 Android/6.0")
+                        "Z-Dev-Apikey", API_KEY,
+                        "Content-Type", "application/json",
+                        "User-Agent", "CVVS/std/1.7.9 Android/6.0"
                 );
 
                 token = obj.getString("token");
@@ -154,8 +157,11 @@ public class RegisterApi {
     private static long parseDate (String toParse) {
         String[] split = toParse.split("[-T:+]");
         Calendar c = Calendar.getInstance();
-        c.set(Integer.parseInt(split[0]), Integer.parseInt(split[1])-1, Integer.parseInt(split[2]),
-                Integer.parseInt(split[3]), Integer.parseInt(split[4]), Integer.parseInt(split[5]));
+        if (split.length == 3)
+            c.set(Integer.parseInt(split[0]), Integer.parseInt(split[1])-1, Integer.parseInt(split[2]));
+        else
+            c.set(Integer.parseInt(split[0]), Integer.parseInt(split[1])-1, Integer.parseInt(split[2]),
+                    Integer.parseInt(split[3]), Integer.parseInt(split[4]), Integer.parseInt(split[5]));
         return c.getTimeInMillis();
     }
 
@@ -170,29 +176,37 @@ public class RegisterApi {
                         BASE_URL+"/rest/v1/students/"+username.substring(1, username.length()-1)+"/grades2",
                         "GET",
                         null,
-                        new AbstractMap.SimpleEntry<>("Z-Dev-Apikey", API_KEY),
-                        new AbstractMap.SimpleEntry<>("Content-Type", "application/json"),
-                        new AbstractMap.SimpleEntry<>("User-Agent", "CVVS/std/1.7.9 Android/6.0"),
-                        new AbstractMap.SimpleEntry<>("Z-Auth-Token", token),
-                        new AbstractMap.SimpleEntry<>("Z-If-None-Match", null)  // TODO: pass 'etag'
+                        "Z-Dev-Apikey", API_KEY,
+                        "Content-Type", "application/json",
+                        "User-Agent", "CVVS/std/1.7.9 Android/6.0",
+                        "Z-Auth-Token", token,
+                        "Z-If-None-Match", null  // TODO: pass 'etag'
                 ).getJSONArray("grades");
 
                 Log.println(Log.ASSERT, TAG, array.toString(4));
 
                 for (int i=0; i<array.length(); i++) {
                     JSONObject obj = array.getJSONObject(i);
-                    MarksData.Subject subject = MarksData.data.get(obj.getInt("subjectId"));
-                    if (subject == null) {
-                        subject = new MarksData.Subject(obj.getString("subjectDesc"));
-                        MarksData.data.put(obj.getInt("subjectId"), subject);
+                    MarksData.Mark old = MarksData.marks.get(obj.getInt("evtId"));
+                    if (old == null){
+                        new MarksData.Mark(
+                                obj.getInt("evtId"),
+                                obj.getInt("subjectId"),
+                                obj.getString("subjectDesc"),
+                                parseDate(obj.getString("evtDate")),
+                                (float) obj.optDouble("decimalValue", -1),
+                                obj.getString("displayValue"),
+                                (byte) obj.getInt("displaPos"),
+                                obj.getString("notesForFamily"),
+                                (byte) obj.getInt("periodPos"),
+                                true,
+                                (byte) -1
+                        );
                     }
-                    subject.addMark(new MarksData.Mark(
-                            obj.getDouble("decimalValue"),
-                            obj.getString("displayValue"),
-                            obj.getInt("displaPos")
-                    ));
                 }
                 MarksData.lastUpdate = System.currentTimeMillis();
+
+                Log.println(Log.ASSERT, TAG, MarksData.data.toString());
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (JSONException e) {
@@ -209,6 +223,7 @@ public class RegisterApi {
 
     public static class MarksData {
         public static final SparseArray<Subject> data = new SparseArray<>();
+        public static final SparseArray<Mark> marks = new SparseArray<>();
 
         public static long lastUpdate = 0;
 
@@ -216,6 +231,7 @@ public class RegisterApi {
             public final SortedList<Mark> marks = new SortedList<>();
             public final String name;
             private double average = 0;
+            private byte newCount = 0;
 
             Subject (String name) {
                 this.name = name;
@@ -223,11 +239,15 @@ public class RegisterApi {
 
             void addMark (Mark mark){
                 average = (average*marks.size()+mark.decimalValue)/(marks.size()+1);
+                if (mark.hasNew < 0) newCount++;
                 marks.add(mark);
             }
 
             public float getAverage () {
                 return Math.round(average*10f)/10f;
+            }
+            public byte getNewCount () {
+                return newCount;
             }
 
             @NonNull
@@ -238,14 +258,33 @@ public class RegisterApi {
         }
 
         public static class Mark implements Comparable<Mark>{
-            public double decimalValue;
-            public String displayValue;
-            private int pos;
+            public final long date;
+            public final float decimalValue;
+            public final String displayValue;
+            public final String info;
+            private final byte pos;
+            public final byte period;
+            public final byte hasNew;
 
-            public Mark (double decimalValue, String displayValue, int pos){
+            public Mark (int id, int subjectId, String subjectName, long date, float decimalValue, String displayValue, byte pos, String info, byte period, boolean save, byte hasNew){
+                this.date = date;
                 this.decimalValue = decimalValue;
                 this.displayValue = displayValue;
                 this.pos = pos;
+                this.info = info;
+                this.period = period;
+                this.hasNew = hasNew;
+
+                if (save) {
+                    MarksData.marks.put(id, this);
+                    Subject sbj = MarksData.data.get(subjectId, new Subject(subjectName));
+                    sbj.addMark(this);
+                    MarksData.data.put(subjectId, sbj);
+                }
+            }
+
+            public Mark (float decimalValue, byte hasNew) {
+                this (0, 0, null, 0L, decimalValue, decimalValue == 10 ? "10" : String.valueOf(decimalValue), (byte) 0, null, (byte) 0x0, false, hasNew);
             }
 
             @NonNull

@@ -67,7 +67,7 @@ public class MarksFragment extends RegisterFragment {
             });
             root.addView(subject);
             ((TextView) subject.findViewById(R.id.textView)).setText(s.name);
-            ((MarkView) subject.findViewById(R.id.markView)).setMark(new RegisterApi.MarksData.Mark(s.getAverage(), String.valueOf(s.getAverage()), 0));
+            ((MarkView) subject.findViewById(R.id.markView)).setMark(new RegisterApi.MarksData.Mark(s.getAverage(), s.getNewCount()));
         }
     }
 

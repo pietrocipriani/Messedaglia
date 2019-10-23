@@ -52,8 +52,6 @@ public class Register extends Fragment {
                              Bundle savedInstanceState) {
 
         Context context = inflater.getContext();
-
-        setFragment(new MarksFragment());
         //prefs = context.getSharedPreferences("register", Context.MODE_PRIVATE);
 
         if (!RegisterApi.load(context)){
@@ -93,6 +91,9 @@ public class Register extends Fragment {
     private void setFragment (RegisterFragment fragment) {
         getChildFragmentManager().beginTransaction().replace(R.id.fragment2, fragment).commit();
         currentFragment = fragment;
+        if (lastUpdateView == null) return;
+        lastUpdateView.setText("Ultimo aggiornamento: ");
+        lastUpdateView.append(Utils.intervalToString(currentFragment.getLastUpdate()));
     }
 
     @Override
@@ -100,6 +101,8 @@ public class Register extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         lastUpdateView = view.findViewById(R.id.last_update);
+
+        setFragment(new MarksFragment());
 
         Handler handler = new Handler();
 

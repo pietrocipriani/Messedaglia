@@ -25,9 +25,10 @@ import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Calendar;
+import java.util.List;
+import java.util.Map;
 
 import it.gov.messedaglia.messedaglia.SortedList;
-import it.gov.messedaglia.messedaglia.fragments.register.MarksFragment;
 
 public class RegisterApi {
     private final static String TAG = "RegisterApi";
@@ -59,6 +60,7 @@ public class RegisterApi {
             token = new String(bytes);
 
             // TODO: load marks data
+            loadMarks(context);
         } catch (IOException e){
             e.printStackTrace();
         }
@@ -75,18 +77,151 @@ public class RegisterApi {
             dos.writeByte(bytes.length);
             dos.write(bytes);
             dos.writeLong(tokenExpire);
-            bytes = token.getBytes();
+            bytes = token == null ? new byte[0] : token.getBytes();
             dos.writeShort(bytes.length);
             dos.write(bytes);
 
             // TODO: save data
+            saveMarks(context);
         } catch (IOException e){
             e.printStackTrace();
         }
     }
 
-    private static void saveMarks (Context context){
+    private static void saveMarks (Context context) throws IOException{
+        File file = new File(context.getFilesDir(), "marks.data");
 
+        DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
+        byte bytes[];
+
+        if (MarksData.etag == null) dos.writeByte(0);
+        else {
+            bytes = MarksData.etag.getBytes();
+            dos.writeByte(bytes.length);
+            dos.write(bytes);
+        }   // print 'etag'
+
+        dos.writeShort(MarksData.marks.size()); // print num of marks
+
+        for (int i = 0; i < MarksData.marks.size(); i++) {
+            MarksData.Mark mark = MarksData.marks.valueAt(i);
+
+            dos.writeInt(MarksData.marks.keyAt(i)); // print id
+            dos.writeInt(mark.subjectId);           // print subject id
+            dos.writeLong(mark.date);               // print date
+            dos.writeFloat(mark.decimalValue);      // print value
+
+            bytes = mark.displayValue.getBytes();
+            dos.writeByte(bytes.length);
+            dos.write(bytes);                       // print value as string
+
+            dos.writeByte(mark.pos);                // print position
+
+            bytes = mark.info.getBytes();
+            dos.writeShort(bytes.length);
+            dos.write(bytes);                       // print info
+
+            dos.writeByte(mark.period);             // print period
+        }
+
+        dos.flush();
+        dos.close();
+
+        saveSubjects(context);
+    }
+    private static void saveSubjects (Context context) throws IOException {
+        File file = new File(context.getFilesDir(), "subjects.data");
+
+        DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
+        byte bytes[];
+
+        dos.writeByte(MarksData.data.size()); // print num of subjects
+
+        for (int i = 0; i < MarksData.data.size(); i++) {
+            MarksData.Subject sbj = MarksData.data.valueAt(i);
+
+            dos.writeInt(MarksData.data.keyAt(i)); // print id
+
+            bytes = sbj.name.getBytes();
+            dos.writeByte(bytes.length);
+            dos.write(bytes);                       // print name
+        }
+
+        dos.flush();
+        dos.close();
+    }
+
+    private static void loadMarks (Context context) throws IOException {
+        loadSubjects (context);
+
+        File file = new File(context.getFilesDir(), "marks.data");
+        if (!file.exists()) return;
+
+        DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+
+        int n;
+        byte bytes[];
+
+        n = dis.readByte();
+        if (n == 0) MarksData.etag = null;
+        else {
+            bytes = new byte[n];
+            dis.readFully(bytes);
+            MarksData.etag = new String(bytes);
+        }
+
+        n = dis.readShort();
+        for (int i = 0; i < n; i++) {
+            int m;
+
+            int id = dis.readInt();
+            int subject = dis.readInt();
+            long date = dis.readLong();
+            float decimalValue = dis.readFloat();
+
+            m = dis.readByte();
+            bytes = new byte[m];
+            dis.readFully(bytes);
+            String displayValue = new String(bytes);
+
+            byte pos = dis.readByte();
+
+            m = dis.readShort();
+            bytes = new byte[m];
+            dis.readFully(bytes);
+            String info = new String(bytes);
+
+            byte period = dis.readByte();
+
+            new MarksData.Mark(id, subject, null, date, decimalValue, displayValue, pos, info, period, true, (byte) 0);
+        }
+
+        dis.close();
+    }
+
+    private static void loadSubjects (Context context) throws IOException {
+        File file = new File(context.getFilesDir(), "subjects.data");
+        if (!file.exists()) return;
+
+        DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+
+        int n;
+        byte bytes[];
+
+        n = dis.readByte();
+        for (int i = 0; i < n; i++) {
+            int id = dis.readInt();
+
+            byte m = dis.readByte();
+            bytes = new byte[m];
+            dis.readFully(bytes);
+            String name = new String(bytes);
+
+            MarksData.data.put(id, new MarksData.Subject(name));
+
+        }
+
+        dis.close();
     }
 
     public static void updateCredentials (@NonNull String username, @NonNull String password, @Nullable Runnable then) {
@@ -104,7 +239,7 @@ public class RegisterApi {
         return true;
     }
 
-    private static JSONObject getJSONObject (String url, String method, String body, String... headers) throws IOException, JSONException {
+    private static JSONObjectResponse getJSONObject (String url, String method, String body, String... headers) throws IOException, JSONException {
         if (headers.length %2 != 0) throw new IllegalArgumentException("headers must be in pairs (key-value).");
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod(method);
@@ -116,10 +251,21 @@ public class RegisterApi {
             out.flush();
             out.close();
         }
+
+        if (conn.getResponseCode() >= 400) {
+            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
+
+            StringBuilder json = new StringBuilder();
+            for (String str = in.readLine(); str != null; str = in.readLine()) json.append(str).append('\n');
+            Log.println(Log.ASSERT, TAG, new JSONObject(json.toString()).toString(4));
+            return null;
+        } else if (conn.getResponseCode() == HttpURLConnection.HTTP_NOT_MODIFIED) return null;
+
         BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+
         StringBuilder json = new StringBuilder();
         for (String str = in.readLine(); str != null; str = in.readLine()) json.append(str).append('\n');
-        return new JSONObject(json.toString());
+        return new JSONObjectResponse(json.toString(), conn.getHeaderFields());
     }
 
     private static void logIn (Runnable then) {
@@ -172,7 +318,7 @@ public class RegisterApi {
     public static void loadMarks (Runnable then) {
         new Thread(() -> {
             try {
-                JSONArray array = getJSONObject(
+                JSONObjectResponse response = getJSONObject(
                         BASE_URL+"/rest/v1/students/"+username.substring(1, username.length()-1)+"/grades2",
                         "GET",
                         null,
@@ -180,8 +326,15 @@ public class RegisterApi {
                         "Content-Type", "application/json",
                         "User-Agent", "CVVS/std/1.7.9 Android/6.0",
                         "Z-Auth-Token", token,
-                        "Z-If-None-Match", null  // TODO: pass 'etag'
-                ).getJSONArray("grades");
+                        "Z-If-None-Match", MarksData.etag
+                );
+                if (response == null) return;
+
+                JSONArray array = response.getJSONArray("grades");
+
+                Log.println(Log.ASSERT, TAG, response.responseHeaders.toString());
+
+                MarksData.etag = response.responseHeaders.get("Etag").get(0);
 
                 Log.println(Log.ASSERT, TAG, array.toString(4));
 
@@ -225,6 +378,8 @@ public class RegisterApi {
         public static final SparseArray<Subject> data = new SparseArray<>();
         public static final SparseArray<Mark> marks = new SparseArray<>();
 
+        private static String etag = null;
+
         public static long lastUpdate = 0;
 
         public static class Subject {
@@ -259,6 +414,7 @@ public class RegisterApi {
 
         public static class Mark implements Comparable<Mark>{
             public final long date;
+            public final int subjectId;
             public final float decimalValue;
             public final String displayValue;
             public final String info;
@@ -274,6 +430,7 @@ public class RegisterApi {
                 this.info = info;
                 this.period = period;
                 this.hasNew = hasNew;
+                this.subjectId = subjectId;
 
                 if (save) {
                     MarksData.marks.put(id, this);
@@ -300,4 +457,13 @@ public class RegisterApi {
         }
     }
 
+}
+
+class JSONObjectResponse extends JSONObject{
+    Map<String, List<String>> responseHeaders;
+
+    JSONObjectResponse (String json, Map<String, List<String>> responseHeaders) throws JSONException{
+        super(json);
+        this.responseHeaders = responseHeaders;
+    }
 }

@@ -123,4 +123,16 @@ public class Register extends Fragment {
         super.onDestroy();
         RegisterApi.save(getContext());
     }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        RegisterApi.save(getContext());
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        RegisterApi.save(getContext());
+    }
 }

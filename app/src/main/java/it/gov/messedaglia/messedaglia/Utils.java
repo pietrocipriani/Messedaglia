@@ -20,6 +20,7 @@ public class Utils {
         interval /= 60;
         if (interval < 24) return interval+" or"+ (interval == 1 ? 'a' : 'e') +" fa";
         interval /= 24;
+        if (interval > 365) return "mai";
         return interval+" giorn"+ (interval == 1 ? 'o' : 'i') +" fa";
     }
 

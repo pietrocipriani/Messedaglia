@@ -76,38 +76,4 @@ public class MarksFragment extends RegisterFragment {
         return RegisterApi.MarksData.lastUpdate;
     }
 
-    /*private class RegisterAdapter extends RecyclerView.Adapter<RegisterViewHolder> {
-
-        @NonNull
-        @Override
-        public RegisterViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
-            View v = ViewGroup.inflate(viewGroup.getContext(), R.layout.subject_item, null);
-            return new RegisterViewHolder(v);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull RegisterViewHolder registerViewHolder, int i) {
-            for (Subject s : RegisterApi.MarksData.data.values())
-                if (i < s.marks.size()) {
-                    registerViewHolder.bind(s.marks.get(i));
-                } else i -= s.marks.size();
-        }
-
-        @Override
-        public int getItemCount() {
-            int c = 0;
-            for (Subject s : RegisterApi.MarksData.data.values()) c += s.marks.size();
-            return c;
-        }
-    }
-    private class RegisterViewHolder extends RecyclerView.ViewHolder {
-
-        public RegisterViewHolder(@NonNull View itemView) {
-            super(itemView);
-        }
-
-        public void bind (RegisterApi.MarksData.Mark m){
-            ((MarkView) itemView.findViewById(R.id.markView)).setMark(m);
-        }
-    }*/
 }

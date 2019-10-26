@@ -5,7 +5,6 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.util.SparseArray;
-import android.view.animation.Interpolator;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -24,10 +23,12 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 
+import it.gov.messedaglia.messedaglia.Http;
 import it.gov.messedaglia.messedaglia.SortedList;
 
 public class RegisterApi {
@@ -239,65 +240,33 @@ public class RegisterApi {
         return true;
     }
 
-    private static JSONObjectResponse getJSONObject (String url, String method, String body, String... headers) throws IOException, JSONException {
-        if (headers.length %2 != 0) throw new IllegalArgumentException("headers must be in pairs (key-value).");
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        conn.setRequestMethod(method);
-        conn.setDoOutput(body != null);
-        for (int i=0; i<headers.length; i+=2) conn.setRequestProperty(headers[i], headers[i+1]);
-        if (body != null) {
-            PrintWriter out = new PrintWriter(conn.getOutputStream());
-            out.print(body);
-            out.flush();
-            out.close();
-        }
-
-        if (conn.getResponseCode() >= 400) {
-            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
-
-            StringBuilder json = new StringBuilder();
-            for (String str = in.readLine(); str != null; str = in.readLine()) json.append(str).append('\n');
-            Log.println(Log.ASSERT, TAG, new JSONObject(json.toString()).toString(4));
-            return null;
-        } else if (conn.getResponseCode() == HttpURLConnection.HTTP_NOT_MODIFIED) return null;
-
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-
-        StringBuilder json = new StringBuilder();
-        for (String str = in.readLine(); str != null; str = in.readLine()) json.append(str).append('\n');
-        return new JSONObjectResponse(json.toString(), conn.getHeaderFields());
-    }
-
     private static void logIn (Runnable then) {
-        Thread t = new Thread(() -> {
-            try {
-                token = null;
-                tokenExpire = 0;
+        Log.println(Log.ASSERT, TAG, "logging");
+        try {
+            token = null;
+            tokenExpire = 0;
 
-                JSONObject obj = getJSONObject(
-                        BASE_URL+"/rest/v1/auth/login",
-                        "POST",
-                        "{\"ident\":null,\"uid\":\""+username+"\",\"pass\":\""+password+"\"}",
-                        "Z-Dev-Apikey", API_KEY,
-                        "Content-Type", "application/json",
-                        "User-Agent", "CVVS/std/1.7.9 Android/6.0"
-                );
+            if (logThread != null && logThread.isAlive()) logThread.interrupt();
+            logThread = Http.post(
+                    BASE_URL+"/rest/v1/auth/login",
+                    "{\"ident\":null,\"uid\":\""+username+"\",\"pass\":\""+password+"\"}",
+                    "Z-Dev-Apikey", API_KEY,
+                    "Content-Type", "application/json",
+                    "User-Agent", "CVVS/std/1.7.9 Android/6.0"
+            ).async(r -> {
+                Log.println(Log.ASSERT, TAG, r.body);
+                JSONObject obj = new JSONObject(r.body);
+                Log.println(Log.ASSERT, TAG, obj.toString(4));
 
                 token = obj.getString("token");
                 tokenExpire = parseDate(obj.getString("expire"));
-                Log.println(Log.ASSERT, "Register", String.valueOf(tokenExpire-System.currentTimeMillis()));
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
+            });
 
             if (then != null) then.run();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        });
-        if (logThread != null && logThread.isAlive()) logThread.interrupt();
-        logThread = t;
-        t.start();
     }
 
     private static long parseDate (String toParse) {
@@ -316,32 +285,30 @@ public class RegisterApi {
     }
 
     public static void loadMarks (Runnable then) {
-        new Thread(() -> {
-            try {
-                JSONObjectResponse response = getJSONObject(
-                        BASE_URL+"/rest/v1/students/"+username.substring(1, username.length()-1)+"/grades2",
-                        "GET",
-                        null,
-                        "Z-Dev-Apikey", API_KEY,
-                        "Content-Type", "application/json",
-                        "User-Agent", "CVVS/std/1.7.9 Android/6.0",
-                        "Z-Auth-Token", token,
-                        "Z-If-None-Match", MarksData.etag
-                );
-                if (response == null) return;
 
-                JSONArray array = response.getJSONArray("grades");
-
-                Log.println(Log.ASSERT, TAG, response.responseHeaders.toString());
-
-                MarksData.etag = response.responseHeaders.get("Etag").get(0);
-
-                Log.println(Log.ASSERT, TAG, array.toString(4));
+        try {
+            Http.get(
+                    BASE_URL+"/rest/v1/students/"+username.substring(1, username.length()-1)+"/grades2",
+                    "Z-Dev-Apikey", API_KEY,
+                    "Content-Type", "application/json",
+                    "User-Agent", "CVVS/std/1.7.9 Android/6.0",
+                    "Z-Auth-Token", token,
+                    "Z-If-None-Match", MarksData.etag
+            ).async(r -> {
+                Log.println(Log.ASSERT, TAG, String.valueOf(r.responseCode));
+                if (r.responseCode >= 400) {
+                    Log.println(Log.ASSERT, TAG, r.request.headers.get("Z-Auth-Token").get(0));
+                    return;
+                }
+                MarksData.lastUpdate = System.currentTimeMillis();
+                if (r.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) return;
+                JSONArray array = new JSONObject(r.body).getJSONArray("grades");
+                MarksData.etag = r.headers.get("Etag").get(0);
 
                 for (int i=0; i<array.length(); i++) {
                     JSONObject obj = array.getJSONObject(i);
                     MarksData.Mark old = MarksData.marks.get(obj.getInt("evtId"));
-                    if (old == null){
+                    if (old == null)
                         new MarksData.Mark(
                                 obj.getInt("evtId"),
                                 obj.getInt("subjectId"),
@@ -355,22 +322,14 @@ public class RegisterApi {
                                 true,
                                 (byte) -1
                         );
-                    }
                 }
-                MarksData.lastUpdate = System.currentTimeMillis();
 
-                Log.println(Log.ASSERT, TAG, MarksData.data.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            if (then != null) then.run();
-            Log.println(Log.ASSERT, TAG, ""+onMarksUpdate);
-            if (onMarksUpdate != null) onMarksUpdate.run();
-
-        }).start();
+                if (then != null) then.run();
+                if (onMarksUpdate != null) onMarksUpdate.run();
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -413,16 +372,16 @@ public class RegisterApi {
         }
 
         public static class Mark implements Comparable<Mark>{
-            public final long date;
-            public final int subjectId;
+            final long date;
+            final int subjectId;
             public final float decimalValue;
             public final String displayValue;
-            public final String info;
+            final String info;
             private final byte pos;
-            public final byte period;
+            final byte period;
             public final byte hasNew;
 
-            public Mark (int id, int subjectId, String subjectName, long date, float decimalValue, String displayValue, byte pos, String info, byte period, boolean save, byte hasNew){
+            Mark (int id, int subjectId, String subjectName, long date, float decimalValue, String displayValue, byte pos, String info, byte period, boolean save, byte hasNew){
                 this.date = date;
                 this.decimalValue = decimalValue;
                 this.displayValue = displayValue;
@@ -457,13 +416,4 @@ public class RegisterApi {
         }
     }
 
-}
-
-class JSONObjectResponse extends JSONObject{
-    Map<String, List<String>> responseHeaders;
-
-    JSONObjectResponse (String json, Map<String, List<String>> responseHeaders) throws JSONException{
-        super(json);
-        this.responseHeaders = responseHeaders;
-    }
 }

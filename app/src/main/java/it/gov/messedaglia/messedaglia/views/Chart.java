@@ -4,21 +4,21 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.SweepGradient;
+import android.graphics.Path;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 
 import it.gov.messedaglia.messedaglia.Utils;
-import it.gov.messedaglia.messedaglia.registerapi.RegisterApi;
 import it.gov.messedaglia.messedaglia.registerapi.RegisterApi.MarksData.Subject;
 
 public class Chart extends View {
 
-    private final static int POINT_RADIUS = Utils.dpToPx(5);
+    private final static int POINT_RADIUS = Utils.dpToPx(3);
 
     private final Paint paint;
+    private final Path path;
 
     private Subject sbj;
 
@@ -37,6 +37,9 @@ public class Chart extends View {
         super(context, attrs, defStyleAttr);
 
         this.paint = new Paint();
+        this.path = new Path();
+
+        paint.setStrokeWidth(Utils.dpToPx(1));
 
         ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
         animation = 0;
@@ -72,7 +75,7 @@ public class Chart extends View {
         drawPath(canvas);
     }
 
-    private void drawPath (Canvas canvas) {
+    private void drawPath(Canvas canvas) {
         if (sbj == null || sbj.marks.isEmpty()) return;
         paint.setColor(0xFF000000);
 
@@ -80,9 +83,67 @@ public class Chart extends View {
 
         canvas.translate(xTranslation, getHeight());
 
-        for (RegisterApi.MarksData.Mark mark : sbj.marks) {
-            canvas.drawCircle(0, - (float)mark.decimalValue/10*getHeight() * animation, POINT_RADIUS, paint);
-            canvas.translate(xTranslation, 0);
+        Point points[] = new Point[sbj.marks.size()];
+
+        for (int i = 0; i < sbj.marks.size(); i++) {
+            points[i] = new Point(xTranslation*i, - sbj.marks.get(i).decimalValue/10*getHeight() * animation);
+            canvas.drawCircle(xTranslation*i, - sbj.marks.get(i).decimalValue/10*getHeight() * animation, POINT_RADIUS, paint);
+        }
+        if (points.length <= 1) return;
+        if (points.length == 2) {
+            canvas.drawLine(points[0].x, points[0].y, points[1].x, points[1].y, paint);
+            return;
+        }
+
+        points = PathPoints.getPathPoints(points);
+        path.reset();
+        path.moveTo(0, 0);
+        int i = 0;
+        path.moveTo(points[i].x, points[i].y);
+        path.quadTo(points[++i].x, points[i].y, points[++i].x, points[i].y);
+        for (i++; i<points.length-2; i++)
+            path.cubicTo(points[i].x, points[i].y, points[++i].x, points[i].y, points[++i].x, points[i].y);
+        path.quadTo(points[i].x, points[i].y, points[++i].x, points[i].y);
+
+        canvas.drawPath(path, paint);
+    }
+
+    private static class PathPoints {
+
+        static Point[] getPathPoints (Point points[]) {
+            Point points2[] = new Point[3*points.length-4];
+            points2[0] = points[0];
+            points2[points2.length-1] = points[points.length-1];
+            for (int i1 = 1, i2 = 2; i1 < points.length-1; i1++, i2 += 3){
+                float m = points[i1-1].m(points[i1+1]);
+                Point point = points[i1];
+                points2[i2] = point;
+                float deltaX1 = point.deltaX(points[i1-1])/3;
+                float deltaX2 = point.deltaX(points[i1+1])/3;
+                points2[i2-1] = new Point(point.x+deltaX1, point.y+deltaX1*m);
+                points2[i2+1] = new Point(point.x+deltaX2, point.y+deltaX2*m);
+            }
+            return points2;
+        }
+    }
+
+    private static class Point {
+        float x, y;
+
+        private Point (float x, float y){
+            this.x = x;
+            this.y = y;
+        }
+
+        private float m (Point p2) {
+            return deltaY(p2)/deltaX(p2);
+        }
+
+        private float deltaX (Point p2) {
+            return p2.x-x;
+        }
+        private float deltaY (Point p2) {
+            return p2.y-y;
         }
     }
 

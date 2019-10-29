@@ -1,8 +1,5 @@
 package it.gov.messedaglia.messedaglia;
 
-import android.app.AlertDialog;
-import android.app.Dialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -47,9 +44,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
             );
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (PackageManager.NameNotFoundException e) {
+        } catch (IOException | PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
 

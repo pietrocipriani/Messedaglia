@@ -17,23 +17,14 @@ import java.util.Map;
 public class Http {
 
     public static Request get (String url, String... headers) throws IOException {
-        if (headers.length %2 != 0) throw new IllegalArgumentException("headers must be in pair key-value, passed an odd number of strings");
-
-        Map<String, List<String>> headersMap = new HashMap<>();
-
-        for (int i = 0; i < headers.length; i+=2) {
-            String key = headers[i], value = headers[i+1];
-            if (!headersMap.containsKey(key)) {
-                ArrayList<String> list = new ArrayList<>();
-                list.add(value);
-                headersMap.put(key, list);
-            } else headersMap.get(key).add(value);
-        }
-
-        return new Request("GET", new URL(url), null, headersMap);
+        return new Request("GET", new URL(url), null, convertHeaders(headers));
     }
 
     public static Request post (String url, String body, String... headers) throws IOException {
+        return new Request("POST", new URL(url), body, convertHeaders(headers));
+    }
+
+    private static Map<String, List<String>> convertHeaders (String... headers) {
         if (headers.length %2 != 0) throw new IllegalArgumentException("headers must be in pair key-value, passed an odd number of strings");
 
         Map<String, List<String>> headersMap = new HashMap<>();
@@ -46,8 +37,7 @@ public class Http {
                 headersMap.put(key, list);
             } else headersMap.get(key).add(value);
         }
-
-        return new Request("POST", new URL(url), body, headersMap);
+        return headersMap;
     }
 
     public static class Request {
@@ -66,29 +56,8 @@ public class Http {
         public Thread async (Then then) {
             Thread t = new Thread(() -> {
                 try {
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod(method);
-                    for (Map.Entry<String, List<String>> entry : headers.entrySet())
-                        for (String value : entry.getValue()) connection.setRequestProperty(entry.getKey(), value);
-                    if (body != null) {
-                        connection.setDoOutput(true);
-                        PrintWriter writer = new PrintWriter(connection.getOutputStream());
-                        writer.write(body);
-                        writer.flush();
-                        writer.close();
-                    }
-                    InputStream stream = connection.getResponseCode() < 400 ? connection.getInputStream() : connection.getErrorStream();
-
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-                    StringBuilder body = new StringBuilder();
-                    for (String str = reader.readLine(); str != null; str = reader.readLine()) body.append(str).append('\n');
-
-                    reader.close();
-
-                    then.then(new Response(body.toString(), connection.getResponseCode(), connection.getHeaderFields(), this));
-                } catch (IOException e){
-                    e.printStackTrace();
-                } catch (JSONException e){
+                    then.then(sync());
+                } catch (IOException | JSONException e){
                     e.printStackTrace();
                 }
             });

@@ -7,26 +7,18 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
 
 import it.gov.messedaglia.messedaglia.Http;
 import it.gov.messedaglia.messedaglia.SortedList;
@@ -49,7 +41,7 @@ public class RegisterApi {
         File file = new File(context.getFilesDir(), "login.data");
         if (!file.exists()) return false;
         try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))){
-            byte bytes[] = new byte[dis.readByte()];
+            byte[] bytes = new byte[dis.readByte()];
             dis.readFully(bytes);
             username = new String(bytes);
             bytes = new byte[dis.readByte()];
@@ -71,7 +63,7 @@ public class RegisterApi {
         File file = new File(context.getFilesDir(), "login.data");
         Log.println(Log.ASSERT, TAG, file.getAbsolutePath());
         try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))){
-            byte bytes[] = username.getBytes();
+            byte[] bytes = username.getBytes();
             dos.writeByte(bytes.length);
             dos.write(bytes);
             bytes = password.getBytes();
@@ -93,7 +85,7 @@ public class RegisterApi {
         File file = new File(context.getFilesDir(), "marks.data");
 
         DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
-        byte bytes[];
+        byte[] bytes;
 
         if (MarksData.etag == null) dos.writeByte(0);
         else {
@@ -134,7 +126,7 @@ public class RegisterApi {
         File file = new File(context.getFilesDir(), "subjects.data");
 
         DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
-        byte bytes[];
+        byte[] bytes;
 
         dos.writeByte(MarksData.data.size()); // print num of subjects
 
@@ -161,7 +153,7 @@ public class RegisterApi {
         DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
 
         int n;
-        byte bytes[];
+        byte[] bytes;
 
         n = dis.readByte();
         if (n == 0) MarksData.etag = null;
@@ -199,7 +191,6 @@ public class RegisterApi {
 
         dis.close();
     }
-
     private static void loadSubjects (Context context) throws IOException {
         File file = new File(context.getFilesDir(), "subjects.data");
         if (!file.exists()) return;
@@ -207,7 +198,7 @@ public class RegisterApi {
         DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
 
         int n;
-        byte bytes[];
+        byte[] bytes;
 
         n = dis.readByte();
         for (int i = 0; i < n; i++) {
@@ -260,9 +251,9 @@ public class RegisterApi {
 
                 token = obj.getString("token");
                 tokenExpire = parseDate(obj.getString("expire"));
-            });
 
-            if (then != null) then.run();
+                if (then != null) then.run();
+            });
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -3,7 +3,6 @@ package it.gov.messedaglia.messedaglia.registerapi;
 import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.util.Log;
 import android.util.SparseArray;
 
 import org.json.JSONArray;
@@ -18,7 +17,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Objects;
 
 import it.gov.messedaglia.messedaglia.Http;
 import it.gov.messedaglia.messedaglia.SortedList;
@@ -36,6 +37,7 @@ public class RegisterApi {
     private static Thread logThread = null;
 
     public static Runnable onMarksUpdate;
+    public static Runnable onNoticesUpdate;
 
     public static boolean load (Context context) {
         File file = new File(context.getFilesDir(), "login.data");
@@ -52,7 +54,6 @@ public class RegisterApi {
             dis.readFully(bytes);
             token = new String(bytes);
 
-            // TODO: load marks data
             loadMarks(context);
         } catch (IOException e){
             e.printStackTrace();
@@ -61,7 +62,6 @@ public class RegisterApi {
     }
     public static void save (Context context){
         File file = new File(context.getFilesDir(), "login.data");
-        Log.println(Log.ASSERT, TAG, file.getAbsolutePath());
         try (DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))){
             byte[] bytes = username.getBytes();
             dos.writeByte(bytes.length);
@@ -86,6 +86,8 @@ public class RegisterApi {
 
         DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
         byte[] bytes;
+
+        dos.writeLong(MarksData.lastUpdate);
 
         if (MarksData.etag == null) dos.writeByte(0);
         else {
@@ -155,6 +157,8 @@ public class RegisterApi {
         int n;
         byte[] bytes;
 
+        MarksData.lastUpdate = dis.readLong();
+
         n = dis.readByte();
         if (n == 0) MarksData.etag = null;
         else {
@@ -216,7 +220,7 @@ public class RegisterApi {
         dis.close();
     }
 
-    public static void updateCredentials (@NonNull String username, @NonNull String password, @Nullable Runnable then) {
+    public static void updateCredentials (@NonNull String username, @NonNull String password, @Nullable OnLogin then) {
         if (username.equals(RegisterApi.username) && password.equals(RegisterApi.password)) {
             if ((logThread != null && logThread.isAlive()) || tokenExpire >= System.currentTimeMillis()) return;
         } else {
@@ -225,14 +229,13 @@ public class RegisterApi {
         }
         logIn(then);
     }
-    public static boolean logWithCredentials (@Nullable Runnable then) {
+    public static boolean logWithCredentials (@Nullable OnLogin then) {
         if (username == null || password == null) return false;
         logIn(then);
         return true;
     }
 
-    private static void logIn (Runnable then) {
-        Log.println(Log.ASSERT, TAG, "logging");
+    private static void logIn (OnLogin then) {
         try {
             token = null;
             tokenExpire = 0;
@@ -245,14 +248,17 @@ public class RegisterApi {
                     "Content-Type", "application/json",
                     "User-Agent", "CVVS/std/1.7.9 Android/6.0"
             ).async(r -> {
-                Log.println(Log.ASSERT, TAG, r.body);
+                if (r.responseCode != HttpURLConnection.HTTP_OK) {
+                    then.then(false);
+                    return;
+                }
+
                 JSONObject obj = new JSONObject(r.body);
-                Log.println(Log.ASSERT, TAG, obj.toString(4));
 
                 token = obj.getString("token");
                 tokenExpire = parseDate(obj.getString("expire"));
 
-                if (then != null) then.run();
+                if (then != null) then.then(true);
             });
         } catch (IOException e) {
             e.printStackTrace();
@@ -271,11 +277,12 @@ public class RegisterApi {
         return c.getTimeInMillis();
     }
 
-    public static void updateAll (Runnable then) {
+    public static void updateAll (@Nullable Runnable then) {
         loadMarks(then);
+        loadNoticeBoard(then);
     }
 
-    public static void loadMarks (Runnable then) {
+    public static void loadMarks (@Nullable Runnable then) {
 
         try {
             Http.get(
@@ -286,15 +293,14 @@ public class RegisterApi {
                     "Z-Auth-Token", token,
                     "Z-If-None-Match", MarksData.etag
             ).async(r -> {
-                Log.println(Log.ASSERT, TAG, String.valueOf(r.responseCode));
-                if (r.responseCode >= 400) {
-                    Log.println(Log.ASSERT, TAG, r.request.headers.get("Z-Auth-Token").get(0));
+                if (r.responseCode >= 400)  return;
+                MarksData.lastUpdate = System.currentTimeMillis();
+                if (r.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED){
+                    if (then != null) then.run();
                     return;
                 }
-                MarksData.lastUpdate = System.currentTimeMillis();
-                if (r.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) return;
                 JSONArray array = new JSONObject(r.body).getJSONArray("grades");
-                MarksData.etag = r.headers.get("Etag").get(0);
+                MarksData.etag = Objects.requireNonNull(r.headers.get("Etag")).get(0);
 
                 for (int i=0; i<array.length(); i++) {
                     JSONObject obj = array.getJSONObject(i);
@@ -322,6 +328,52 @@ public class RegisterApi {
             e.printStackTrace();
         }
     }
+    public static void loadNoticeBoard (@Nullable Runnable then ) {
+        try {
+            Http.get(
+                    BASE_URL+"/rest/v1/students/"+username.substring(1, username.length()-1)+"/noticeboard",
+                    "Z-Dev-Apikey", API_KEY,
+                    "Content-Type", "application/json",
+                    "User-Agent", "CVVS/std/1.7.9 Android/6.0",
+                    "Z-Auth-Token", token,
+                    "Z-If-None-Match", Notices.etag
+            ).async(r -> {
+                if (r.responseCode >= 400) return;
+                Notices.lastUpdate = System.currentTimeMillis();
+                if (r.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED){
+                    if (then != null) then.run();
+                    return;
+                }
+
+                JSONArray array = new JSONObject(r.body).getJSONArray("items");
+                Notices.etag = Objects.requireNonNull(r.headers.get("Etag")).get(0);
+
+                for (int i=0; i<array.length(); i++) {
+                    JSONObject obj = array.getJSONObject(i);
+                    Notices.Notice old = Notices.notices.get(obj.getInt("pubId"));
+                    if (old == null) {
+                        JSONArray attachmentsJSON = obj.getJSONArray("attachments");
+                        int[] attachments = new int[attachmentsJSON.length()];
+                        for (int j = 0; j < attachments.length; j++) attachments[j] = attachmentsJSON.getJSONObject(j).getInt("attachNum");
+                        new Notices.Notice(
+                                obj.getInt("pubId"),
+                                parseDate(obj.getString("pubDT")),
+                                obj.getBoolean("readStatus"),
+                                obj.getString("evtCode"),
+                                obj.getBoolean("cntValidInRange") && obj.getString("cntStatus").equals("active"),
+                                obj.getString("cntTitle"),
+                                attachments
+                        );
+                    }
+                }
+
+                if (then != null) then.run();
+                if (onNoticesUpdate != null) onNoticesUpdate.run();
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 
     public static class MarksData {
@@ -334,6 +386,7 @@ public class RegisterApi {
 
         public static class Subject {
             public final SortedList<Mark> marks = new SortedList<>();
+            public final SortedList<Mark> nonBlueMarks = new SortedList<>();
             public final String name;
             private double average = 0;
             private byte newCount = 0;
@@ -343,13 +396,17 @@ public class RegisterApi {
             }
 
             void addMark (Mark mark){
-                average = (average*marks.size()+mark.decimalValue)/(marks.size()+1);
+                if (!mark.isBlue()) {
+                    average += mark.decimalValue;
+                    nonBlueMarks.add(mark);
+                }
+
                 if (mark.hasNew < 0) newCount++;
                 marks.add(mark);
             }
 
             public float getAverage () {
-                return Math.round(average*10f)/10f;
+                return Math.round(average/nonBlueMarks.size()*10f)/10f;
             }
             public byte getNewCount () {
                 return newCount;
@@ -404,7 +461,46 @@ public class RegisterApi {
             public int compareTo(Mark mark) {
                 return Integer.compare(pos, mark.pos);
             }
+
+            public boolean isBlue () {
+                return decimalValue < 0;
+            }
         }
+    }
+    public static class Notices {
+        public static final SparseArray<Notice> notices = new SparseArray<>();
+
+        private static String etag = null;
+
+        public static long lastUpdate = 0;
+
+        public static class Notice {
+            public final long date;
+            public final boolean read, valid;
+            public final String evt, title;
+            public final int[] attachments;
+
+            Notice (int id, long date, boolean read, String evt, boolean valid, String title, int... attachments) {
+                this.date = date;
+                this.read = read;
+                this.evt = evt;
+                this.valid = valid;
+                this.title = title;
+                this.attachments = attachments;
+
+                notices.put(id, this);
+            }
+
+            @NonNull
+            @Override
+            public String toString() {
+                return "{\n\tdate: "+date+"\n\tread: "+read+"\n\t"+"valid: "+valid+"\n\tevt: "+evt+"\n\ttitle: "+title+"\n\tattachments: "+ Arrays.toString(attachments) +"\n}";
+            }
+        }
+    }
+
+    public interface OnLogin {
+        void then (boolean logged);
     }
 
 }

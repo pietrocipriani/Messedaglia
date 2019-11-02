@@ -3,8 +3,6 @@ package it.gov.messedaglia.messedaglia;
 import android.content.res.Resources;
 import android.util.DisplayMetrics;
 
-import java.util.Calendar;
-
 public class Utils {
 
     public static int dpToPx (float dp){
@@ -23,6 +21,5 @@ public class Utils {
         if (interval > 365) return "mai";
         return interval+" giorn"+ (interval == 1 ? 'o' : 'i') +" fa";
     }
-
 
 }

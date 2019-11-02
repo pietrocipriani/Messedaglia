@@ -22,7 +22,7 @@ public class Chart extends View {
 
     private Subject sbj;
 
-    private float animation = 0;
+    private float animation;
 
 
     public Chart(Context context) {
@@ -79,15 +79,15 @@ public class Chart extends View {
         if (sbj == null || sbj.marks.isEmpty()) return;
         paint.setColor(0xFF000000);
 
-        float xTranslation = (float) getWidth()/(sbj.marks.size()+1);
+        float xTranslation = (float) getWidth()/(sbj.nonBlueMarks.size()+1);
 
         canvas.translate(xTranslation, getHeight());
 
-        Point points[] = new Point[sbj.marks.size()];
+        Point[] points = new Point[sbj.nonBlueMarks.size()];
 
-        for (int i = 0; i < sbj.marks.size(); i++) {
-            points[i] = new Point(xTranslation*i, - sbj.marks.get(i).decimalValue/10*getHeight() * animation);
-            canvas.drawCircle(xTranslation*i, - sbj.marks.get(i).decimalValue/10*getHeight() * animation, POINT_RADIUS, paint);
+        for (int i = 0; i < points.length; i++) {
+            points[i] = new Point(xTranslation*i, - sbj.nonBlueMarks.get(i).decimalValue/10*getHeight() * animation);
+            canvas.drawCircle(xTranslation*i, - sbj.nonBlueMarks.get(i).decimalValue/10*getHeight() * animation, POINT_RADIUS, paint);
         }
         if (points.length <= 1) return;
         if (points.length == 2) {
@@ -95,7 +95,7 @@ public class Chart extends View {
             return;
         }
 
-        points = PathPoints.getPathPoints(points);
+        points = getPathPoints(points);
         path.reset();
         path.moveTo(0, 0);
         int i = 0;
@@ -108,23 +108,20 @@ public class Chart extends View {
         canvas.drawPath(path, paint);
     }
 
-    private static class PathPoints {
-
-        static Point[] getPathPoints (Point points[]) {
-            Point points2[] = new Point[3*points.length-4];
-            points2[0] = points[0];
-            points2[points2.length-1] = points[points.length-1];
-            for (int i1 = 1, i2 = 2; i1 < points.length-1; i1++, i2 += 3){
-                float m = points[i1-1].m(points[i1+1]);
-                Point point = points[i1];
-                points2[i2] = point;
-                float deltaX1 = point.deltaX(points[i1-1])/3;
-                float deltaX2 = point.deltaX(points[i1+1])/3;
-                points2[i2-1] = new Point(point.x+deltaX1, point.y+deltaX1*m);
-                points2[i2+1] = new Point(point.x+deltaX2, point.y+deltaX2*m);
-            }
-            return points2;
+    private static Point[] getPathPoints (Point[] points) {
+        Point[] points2 = new Point[3*points.length-4];
+        points2[0] = points[0];
+        points2[points2.length-1] = points[points.length-1];
+        for (int i1 = 1, i2 = 2; i1 < points.length-1; i1++, i2 += 3){
+            float m = points[i1-1].m(points[i1+1]);
+            Point point = points[i1];
+            points2[i2] = point;
+            float deltaX1 = point.deltaX(points[i1-1])/3;
+            float deltaX2 = point.deltaX(points[i1+1])/3;
+            points2[i2-1] = new Point(point.x+deltaX1, point.y+deltaX1*m);
+            points2[i2+1] = new Point(point.x+deltaX2, point.y+deltaX2*m);
         }
+        return points2;
     }
 
     private static class Point {

@@ -2,17 +2,17 @@
 <android.support.v4.widget.SwipeRefreshLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/subject_container"
+    android:id="@+id/notices_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".fragments.register.MarksFragment">
+    tools:context=".fragments.register.NoticesFragment">
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
         <LinearLayout
-            android:id="@+id/marks_list"
+            android:id="@+id/notices_list"
             android:showDividers="middle"
             android:divider="?android:listDivider"
             android:orientation="vertical"
